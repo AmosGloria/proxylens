@@ -1,3 +1,11 @@
-.env
+
 .env.local
 .env.*.local
+
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore
+echo "db.sqlite3" >> .gitignore
+echo ".env" >> .gitignore__pycache__/
+*.pyc
+db.sqlite3
+.env
