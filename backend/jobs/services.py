@@ -1,6 +1,6 @@
 import time
-import httpx
 
+import httpx
 from django.utils import timezone
 
 from logs.models import RequestLog
@@ -13,15 +13,23 @@ def run_scraping_job(job):
     """
     Runs a simple monitoring request for a scraping job.
 
-    This function does not parse page content yet.
-    It only checks whether the target URL responds successfully,
-    how long it takes, and what status code is returned.
+    This function checks:
+    - whether the target URL responds
+    - response status code
+    - response time
+    - response size
+
+    Proxy rotation and SEO parsing will come in later phases.
     """
 
     target_url = job.target_url
     url = target_url.url
 
     started_at = time.perf_counter()
+
+    job.run_status = job.RunStatus.RUNNING
+    job.last_error_message = ""
+    job.save(update_fields=["run_status", "last_error_message", "updated_at"])
 
     try:
         headers = {
@@ -53,17 +61,24 @@ def run_scraping_job(job):
         )
 
         job.total_runs += 1
+
         if is_success:
             job.successful_runs += 1
+            job.run_status = job.RunStatus.COMPLETED
+            job.last_error_message = ""
         else:
             job.failed_runs += 1
+            job.run_status = job.RunStatus.FAILED
+            job.last_error_message = f"Request returned HTTP {response.status_code}"
 
         job.last_run_at = timezone.now()
         job.save(update_fields=[
+            "run_status",
             "total_runs",
             "successful_runs",
             "failed_runs",
             "last_run_at",
+            "last_error_message",
             "updated_at",
         ])
 
@@ -74,6 +89,7 @@ def run_scraping_job(job):
 
     except httpx.RequestError as exc:
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        error_message = str(exc)
 
         log = RequestLog.objects.create(
             job=job,
@@ -83,17 +99,22 @@ def run_scraping_job(job):
             status_code=None,
             response_time_ms=elapsed_ms,
             response_size_bytes=None,
-            error_message=str(exc),
+            error_message=error_message,
             retry_count=0,
         )
 
         job.total_runs += 1
         job.failed_runs += 1
+        job.run_status = job.RunStatus.FAILED
+        job.last_error_message = error_message
         job.last_run_at = timezone.now()
+
         job.save(update_fields=[
+            "run_status",
             "total_runs",
             "failed_runs",
             "last_run_at",
+            "last_error_message",
             "updated_at",
         ])
 

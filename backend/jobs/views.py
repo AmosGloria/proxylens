@@ -5,8 +5,7 @@ from rest_framework.response import Response
 
 from .models import ScrapingJob
 from .serializers import ScrapingJobSerializer
-from .services import run_scraping_job
-from logs.serializers import RequestLogSerializer
+from .tasks import run_scraping_job_task
 
 
 class ScrapingJobViewSet(viewsets.ModelViewSet):
@@ -38,13 +37,46 @@ class ScrapingJobViewSet(viewsets.ModelViewSet):
     def run(self, request, pk=None):
         job = self.get_object()
 
-        log = run_scraping_job(job)
-        data = RequestLogSerializer(log).data
+        if job.status != ScrapingJob.Status.ACTIVE:
+            return Response(
+                {
+                    "message": "Only active jobs can be queued.",
+                    "current_status": job.status,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if job.run_status in [
+            ScrapingJob.RunStatus.QUEUED,
+            ScrapingJob.RunStatus.RUNNING,
+        ]:
+            return Response(
+                {
+                    "message": "This job is already queued or running.",
+                    "run_status": job.run_status,
+                    "task_id": job.last_task_id,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        task = run_scraping_job_task.delay(job.id)
+
+        job.run_status = ScrapingJob.RunStatus.QUEUED
+        job.last_task_id = task.id
+        job.last_error_message = ""
+        job.save(update_fields=[
+            "run_status",
+            "last_task_id",
+            "last_error_message",
+            "updated_at",
+        ])
 
         return Response(
             {
-                "message": "Job executed successfully.",
-                "log": data,
+                "message": "Job queued successfully.",
+                "job_id": job.id,
+                "task_id": task.id,
+                "run_status": job.run_status,
             },
-            status=status.HTTP_200_OK,
+            status=status.HTTP_202_ACCEPTED,
         )

@@ -12,3 +12,41 @@ db.sqlite3
 
 echo ".env" >> .gitignore
 echo "venv/" >> .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+db.sqlite3
+# Virtual environment
+venv/
+.env
+.env.*
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Logs
+*.log
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Node / frontend
+node_modules/
+.next/
+out/
+dist/
+.env.local
