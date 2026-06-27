@@ -9,3 +9,6 @@ echo ".env" >> .gitignore__pycache__/
 *.pyc
 db.sqlite3
 .env
+
+echo ".env" >> .gitignore
+echo "venv/" >> .gitignore
